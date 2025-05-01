@@ -21,5 +21,7 @@ namespace MarketplaceAPI.Models
         
         [Required]
         public string Role { get; set; } // e.g., "Admin", "User"
+
+        public ICollection<UserProduct> UserProducts { get; set; } = new List<UserProduct>();
     }
 }
