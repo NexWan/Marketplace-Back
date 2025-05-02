@@ -49,8 +49,16 @@ public class AuthController : ControllerBase
 
         var userId = identity.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var username = identity.FindFirst(ClaimTypes.Name)?.Value;
+        var role = identity.FindFirst(ClaimTypes.Role)?.Value;
 
-        return Ok(new { id = userId, username });
+        return Ok(new { id = userId, username, role });
+    }
+
+    [HttpPost("Logout")]
+    public IActionResult Logout()
+    {
+        Response.Cookies.Delete("jwt");
+        return Ok(new { message = "Logout successful" });
     }
 
     private string GenerateJwtToken(User user)
