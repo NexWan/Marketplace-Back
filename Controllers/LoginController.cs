@@ -5,6 +5,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using MarketplaceAPI.Contexts;
+using Microsoft.AspNetCore.Authorization;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -27,7 +28,29 @@ public class AuthController : ControllerBase
             return Unauthorized("Invalid credentials");
 
         var token = GenerateJwtToken(user);
-        return Ok(new { token });
+
+        Response.Cookies.Append("jwt", token, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None,
+            Expires = DateTimeOffset.UtcNow.AddHours(2)
+        });
+        return Ok(new { message  = "Login succesful" });
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public IActionResult Me()
+    {
+        var identity = HttpContext.User.Identity as ClaimsIdentity;
+        if (identity == null || !identity.IsAuthenticated)
+            return Unauthorized("User not authenticated");
+
+        var userId = identity.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var username = identity.FindFirst(ClaimTypes.Name)?.Value;
+
+        return Ok(new { id = userId, username });
     }
 
     private string GenerateJwtToken(User user)
@@ -43,6 +66,7 @@ public class AuthController : ControllerBase
 
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],
+            audience: _config["Jwt:Issuer"], 
             claims: claims,
             expires: DateTime.UtcNow.AddHours(2),
             signingCredentials: creds
