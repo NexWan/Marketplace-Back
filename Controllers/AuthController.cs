@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Text;
 using MarketplaceAPI.Contexts;
 using Microsoft.AspNetCore.Authorization;
+using MarketplaceAPI.Services;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -13,11 +14,13 @@ public class AuthController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IConfiguration _config;
+    private readonly JwtService _jwtService;
 
-    public AuthController(AppDbContext context, IConfiguration config)
+    public AuthController(AppDbContext context, IConfiguration config, JwtService jwtService)
     {
         _context = context;
         _config = config;
+        _jwtService = jwtService;
     }
 
     [HttpPost("login")]
@@ -27,7 +30,7 @@ public class AuthController : ControllerBase
         if (user == null || !BCrypt.Net.BCrypt.Verify(login.Password, user.Password))
             return Unauthorized("Invalid credentials");
 
-        var token = GenerateJwtToken(user);
+        var token = _jwtService.GenerateToken(user);
 
         Response.Cookies.Append("jwt", token, new CookieOptions
         {
@@ -50,8 +53,10 @@ public class AuthController : ControllerBase
         var userId = identity.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var username = identity.FindFirst(ClaimTypes.Name)?.Value;
         var role = identity.FindFirst(ClaimTypes.Role)?.Value;
+        var email = identity.FindFirst(ClaimTypes.Email)?.Value;
+        var profilePictureUrl = identity.FindFirst("ProfilePictureUrl")?.Value;
 
-        return Ok(new { id = userId, username, role });
+        return Ok(new { id = userId, username, role, email, profilePictureUrl });
     }
 
     [HttpPost("Logout")]
@@ -61,25 +66,5 @@ public class AuthController : ControllerBase
         return Ok(new { message = "Logout successful" });
     }
 
-    private string GenerateJwtToken(User user)
-    {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Username)
-        };
-
-        var token = new JwtSecurityToken(
-            issuer: _config["Jwt:Issuer"],
-            audience: _config["Jwt:Issuer"], 
-            claims: claims,
-            expires: DateTime.UtcNow.AddHours(2),
-            signingCredentials: creds
-        );
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
+    
 }
